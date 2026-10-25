@@ -94,6 +94,22 @@ void display_blind_signed_review(parseResult_t* transaction_param,
                                    "Sign transaction?", NULL, reviewChoice);
 }
 
+#ifdef HAVE_SE_TOUCH
+// Whether the transaction names its vault: a LoanSet names its loan broker
+// instead.
+static bool names_vault(const parseResult_t* tx) {
+    for (uint8_t i = 0; i < tx->num_fields; i++) {
+        const field_t* field = &tx->fields[i];
+        if (field->data_type == STI_HASH256 &&
+            field->id == XRP_HASH256_VAULT_ID &&
+            field->array_info.type == ARRAY_NONE) {
+            return true;
+        }
+    }
+    return false;
+}
+#endif
+
 void display_review_menu(parseResult_t* transaction_param,
                          resultAction_t callback) {
     transaction = transaction_param;
@@ -119,15 +135,18 @@ void display_review_menu(parseResult_t* transaction_param,
 
     // Some amounts are in the base units of an asset the transaction does
     // not name, the vault's: say so before the review, since a host could
-    // swap the vault ID for one in another asset and the amounts would read
-    // the same.
+    // swap the vault ID (in a LoanSet, the loan broker ID) for one in another
+    // asset and the amounts would read the same.
     memset(&asset_warning_info, 0, sizeof(asset_warning_info));
     asset_warning_info.icon = &LARGE_WARNING_ICON;
     asset_warning_info.title = "Asset not verified";
 #ifdef HAVE_SE_TOUCH
     asset_warning_info.description =
-        "Amounts are in base units of the vault's asset, drops for XRP. "
-        "Verify the vault ID.";
+        names_vault(transaction)
+            ? "Amounts are in base units of the vault's asset, drops for XRP. "
+              "Verify the vault ID."
+            : "Amounts are in base units of the vault's asset, drops for XRP. "
+              "Verify the loan broker ID.";
 #else
     // A Nano shows two short lines under the title
     asset_warning_info.description = "In base units of the vault's asset";

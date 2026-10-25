@@ -35,6 +35,15 @@ The XRP wallet app comes with the following features:
   - EscrowCancel
   - EscrowCreate
   - EscrowFinish
+  - LoanBrokerCoverClawback
+  - LoanBrokerCoverDeposit
+  - LoanBrokerCoverWithdraw
+  - LoanBrokerDelete
+  - LoanBrokerSet
+  - LoanDelete
+  - LoanManage
+  - LoanPay
+  - LoanSet
   - NFTokenAcceptOffer
   - NFTokenBurn
   - NFTokenCancelOffer
@@ -258,15 +267,17 @@ hardware wallet:
 - Maximum number of elements per array field: 8 elements
 - Multi-sign support: Parallel only
 
-#### Vault transactions
+#### Vault and lending transactions
 
-- A `VaultSet`'s `AssetsMaximum` is in the vault's asset, which the
-  transaction does not carry: it is shown in the asset's base units (drops for
-  XRP), labelled, after an "Asset not verified" warning. A `VaultCreate`
-  carries the asset, so its `AssetsMaximum` is shown in it.
-- A vault is identified only by its ID.
+- A `VaultSet`'s `AssetsMaximum`, a `LoanBrokerSet`'s `DebtMaximum`, and a
+  `LoanSet`'s `PrincipalRequested` and fees are in the vault's asset, which
+  the transaction does not carry: they are shown in the asset's base units
+  (drops for XRP), labelled, after an "Asset not verified" warning. A
+  `VaultCreate` carries the asset, so its `AssetsMaximum` is shown in it.
+- A vault, a loan broker or a loan is identified only by its ID.
 - Vaults of an MPT are not supported yet: such a transaction is rejected.
-- A `VaultWithdraw` with `CredentialIDs` goes to blind signing.
+- A `VaultWithdraw` or `LoanBrokerCoverWithdraw` with `CredentialIDs` goes to
+  blind signing.
 
 ## Building
 

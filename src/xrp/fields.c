@@ -32,9 +32,33 @@
 // The defaults, from rippled 3.4.1
 const default_field_t DEFAULT_FIELDS[] = {
     // VaultCreate.cpp:260: no limit
-    {TRANSACTION_VAULT_CREATE, STI_NUMBER, XRP_NUMBER_ASSETS_MAXIMUM},
+    {TRANSACTION_VAULT_CREATE, STI_NUMBER, XRP_NUMBER_ASSETS_MAXIMUM, 0},
     // VaultClawback.cpp:63-76 and 282: all the holder has
-    {TRANSACTION_VAULT_CLAWBACK, STI_AMOUNT, XRP_UINT64_AMOUNT},
+    {TRANSACTION_VAULT_CLAWBACK, STI_AMOUNT, XRP_UINT64_AMOUNT, 0},
+    // LoanSet.h:65-73: one payment, due every 60 s, with 60 s of grace
+    {TRANSACTION_LOAN_SET, STI_UINT32, XRP_UINT32_PAYMENT_TOTAL, 1},
+    {TRANSACTION_LOAN_SET, STI_UINT32, XRP_UINT32_PAYMENT_INTERVAL, 60},
+    {TRANSACTION_LOAN_SET, STI_UINT32, XRP_UINT32_GRACE_PERIOD, 60},
+    // LoanSet.cpp:674-682: no interest and no fees
+    {TRANSACTION_LOAN_SET, STI_UINT32, XRP_UINT32_INTEREST_RATE, 0},
+    {TRANSACTION_LOAN_SET, STI_UINT32, XRP_UINT32_LATE_INTEREST_RATE, 0},
+    {TRANSACTION_LOAN_SET, STI_UINT32, XRP_UINT32_CLOSE_INTEREST_RATE, 0},
+    {TRANSACTION_LOAN_SET, STI_UINT32, XRP_UINT32_OVERPAYMENT_INTEREST_RATE, 0},
+    {TRANSACTION_LOAN_SET, STI_UINT32, XRP_UINT32_OVERPAYMENT_FEE, 0},
+    {TRANSACTION_LOAN_SET, STI_NUMBER, XRP_NUMBER_LOAN_ORIGINATION_FEE, 0},
+    {TRANSACTION_LOAN_SET, STI_NUMBER, XRP_NUMBER_LOAN_SERVICE_FEE, 0},
+    {TRANSACTION_LOAN_SET, STI_NUMBER, XRP_NUMBER_LATE_PAYMENT_FEE, 0},
+    {TRANSACTION_LOAN_SET, STI_NUMBER, XRP_NUMBER_CLOSE_PAYMENT_FEE, 0},
+    // LoanSet.cpp:294: the loan broker's owner
+    {TRANSACTION_LOAN_SET, STI_ACCOUNT, XRP_ACCOUNT_COUNTERPARTY, 0},
+    // LoanBrokerSet.cpp:278-287, for a new broker only: no fee, no cover and
+    // no debt limit
+    {TRANSACTION_LOAN_BROKER_SET, STI_UINT16, XRP_UINT16_MANAGEMENT_FEE_RATE,
+     0},
+    {TRANSACTION_LOAN_BROKER_SET, STI_UINT32, XRP_UINT32_COVER_RATE_MINIMUM, 0},
+    {TRANSACTION_LOAN_BROKER_SET, STI_UINT32, XRP_UINT32_COVER_RATE_LIQUIDATION,
+     0},
+    {TRANSACTION_LOAN_BROKER_SET, STI_NUMBER, XRP_NUMBER_DEBT_MAXIMUM, 0},
 };
 const size_t DEFAULT_FIELD_COUNT =
     sizeof(DEFAULT_FIELDS) / sizeof(DEFAULT_FIELDS[0]);
@@ -64,6 +88,18 @@ bool is_default_field(const field_t* field, uint16_t transaction_type) {
 #define VAULT_DEPOSIT TYPE_BIT(TRANSACTION_VAULT_DEPOSIT)
 #define VAULT_WITHDRAW TYPE_BIT(TRANSACTION_VAULT_WITHDRAW)
 #define VAULT_CLAWBACK TYPE_BIT(TRANSACTION_VAULT_CLAWBACK)
+#define LOAN_BROKER_SET TYPE_BIT(TRANSACTION_LOAN_BROKER_SET)
+#define LOAN_BROKER_DELETE TYPE_BIT(TRANSACTION_LOAN_BROKER_DELETE)
+#define LOAN_BROKER_COVER_DEPOSIT \
+    TYPE_BIT(TRANSACTION_LOAN_BROKER_COVER_DEPOSIT)
+#define LOAN_BROKER_COVER_WITHDRAW \
+    TYPE_BIT(TRANSACTION_LOAN_BROKER_COVER_WITHDRAW)
+#define LOAN_BROKER_COVER_CLAWBACK \
+    TYPE_BIT(TRANSACTION_LOAN_BROKER_COVER_CLAWBACK)
+#define LOAN_SET TYPE_BIT(TRANSACTION_LOAN_SET)
+#define LOAN_DELETE TYPE_BIT(TRANSACTION_LOAN_DELETE)
+#define LOAN_MANAGE TYPE_BIT(TRANSACTION_LOAN_MANAGE)
+#define LOAN_PAY TYPE_BIT(TRANSACTION_LOAN_PAY)
 
 typedef struct {
     field_type_t data_type;
@@ -71,27 +107,51 @@ typedef struct {
     uint32_t types;
 } scoped_field_t;
 
-// The fields named for the vault transactions, each with the types that carry
-// it in rippled 3.4.1's transactions.macro. In any other transaction type
-// they keep no name, as before these types were supported.
+// The fields named for the vault and loan transactions, each with the types
+// that carry it in rippled 3.4.1's transactions.macro. In any other transaction
+// type they keep no name, as before these types were supported.
 static const scoped_field_t SCOPED_FIELDS[] = {
     {STI_UINT8, XRP_UINT8_SCALE, VAULT_CREATE},
     {STI_UINT8, XRP_UINT8_WITHDRAWAL_POLICY, VAULT_CREATE},
     {STI_UINT8, XRP_UINT8_VAULT_KIND, VAULT_CREATE},
+    {STI_UINT16, XRP_UINT16_MANAGEMENT_FEE_RATE, LOAN_BROKER_SET},
+    {STI_UINT32, XRP_UINT32_PAYMENT_INTERVAL, LOAN_SET},
+    {STI_UINT32, XRP_UINT32_GRACE_PERIOD, LOAN_SET},
+    {STI_UINT32, XRP_UINT32_PAYMENT_TOTAL, LOAN_SET},
+    {STI_UINT32, XRP_UINT32_COVER_RATE_MINIMUM, LOAN_BROKER_SET},
+    {STI_UINT32, XRP_UINT32_COVER_RATE_LIQUIDATION, LOAN_BROKER_SET},
+    {STI_UINT32, XRP_UINT32_OVERPAYMENT_FEE, LOAN_SET},
+    {STI_UINT32, XRP_UINT32_INTEREST_RATE, LOAN_SET},
+    {STI_UINT32, XRP_UINT32_LATE_INTEREST_RATE, LOAN_SET},
+    {STI_UINT32, XRP_UINT32_CLOSE_INTEREST_RATE, LOAN_SET},
+    {STI_UINT32, XRP_UINT32_OVERPAYMENT_INTEREST_RATE, LOAN_SET},
     {STI_UINT32, XRP_UINT32_SUBSCRIPTION_DATE, VAULT_CREATE},
     {STI_UINT32, XRP_UINT32_REDEMPTION_DATE, VAULT_CREATE},
     {STI_HASH256, XRP_HASH256_DOMAIN_ID, VAULT_CREATE | VAULT_SET},
     {STI_HASH256, XRP_HASH256_VAULT_ID,
      VAULT_SET | VAULT_DELETE | VAULT_DEPOSIT | VAULT_WITHDRAW |
-         VAULT_CLAWBACK},
-    {STI_VL, XRP_VL_DATA, VAULT_CREATE | VAULT_SET},
+         VAULT_CLAWBACK | LOAN_BROKER_SET},
+    {STI_HASH256, XRP_HASH256_LOAN_BROKER_ID,
+     LOAN_BROKER_SET | LOAN_BROKER_DELETE | LOAN_BROKER_COVER_DEPOSIT |
+         LOAN_BROKER_COVER_WITHDRAW | LOAN_BROKER_COVER_CLAWBACK | LOAN_SET},
+    {STI_HASH256, XRP_HASH256_LOAN_ID, LOAN_DELETE | LOAN_MANAGE | LOAN_PAY},
+    {STI_VL, XRP_VL_DATA,
+     VAULT_CREATE | VAULT_SET | LOAN_BROKER_SET | LOAN_SET},
     {STI_VL, XRP_VL_MPTOKEN_METADATA, VAULT_CREATE},
     {STI_ACCOUNT, XRP_ACCOUNT_HOLDER, VAULT_CLAWBACK},
+    {STI_ACCOUNT, XRP_ACCOUNT_COUNTERPARTY, LOAN_SET},
     {STI_NUMBER, XRP_NUMBER_ASSETS_MAXIMUM, VAULT_CREATE | VAULT_SET},
+    {STI_NUMBER, XRP_NUMBER_DEBT_MAXIMUM, LOAN_BROKER_SET},
+    {STI_NUMBER, XRP_NUMBER_LOAN_ORIGINATION_FEE, LOAN_SET},
+    {STI_NUMBER, XRP_NUMBER_LOAN_SERVICE_FEE, LOAN_SET},
+    {STI_NUMBER, XRP_NUMBER_LATE_PAYMENT_FEE, LOAN_SET},
+    {STI_NUMBER, XRP_NUMBER_CLOSE_PAYMENT_FEE, LOAN_SET},
+    {STI_NUMBER, XRP_NUMBER_PRINCIPAL_REQUESTED, LOAN_SET},
 };
 
 static uint32_t type_bit(uint16_t transaction_type) {
-    if (!is_vault_transaction(transaction_type)) {
+    if (!is_vault_transaction(transaction_type) &&
+        !is_loan_transaction(transaction_type)) {
         return 0;
     }
     return TYPE_BIT(transaction_type);
@@ -137,6 +197,8 @@ const char* resolve_field_name(field_t* field) {
                 return "Trading Fee";
             case 6:
                 return "Discount Fee";
+            case 22:
+                return "Management Fee Rate";
         }
     }
 
@@ -189,6 +251,26 @@ const char* resolve_field_name(field_t* field) {
                 return "Ticket Sequence";
             case 42:
                 return "NFToken Taxon";
+            case 55:
+                return "Payment Interval";
+            case 56:
+                return "Grace Period";
+            case 60:
+                return "Payment Total";
+            case 62:
+                return "Cover Rate Minimum";
+            case 63:
+                return "Cover Rate Liquidation";
+            case 64:
+                return "Overpayment Fee";
+            case 65:
+                return "Interest Rate";
+            case 66:
+                return "Late Interest Rate";
+            case 67:
+                return "Close Interest Rate";
+            case 68:
+                return "Overpayment Interest Rate";
             case 75:
                 return "Subscription Date";
             case 76:
@@ -232,6 +314,10 @@ const char* resolve_field_name(field_t* field) {
                 return "Domain ID";
             case 35:
                 return "Vault ID";
+            case 37:
+                return "Loan Broker ID";
+            case 38:
+                return "Loan ID";
             case 0xFE:
                 return "NFToken Offer";
         }
@@ -343,6 +429,8 @@ const char* resolve_field_name(field_t* field) {
                 return "NFToken Minter";
             case 11:
                 return "Holder";
+            case 26:
+                return "Counterparty";
         }
     }
 
@@ -396,9 +484,21 @@ const char* resolve_field_name(field_t* field) {
 
     if (field->data_type == STI_NUMBER) {
         switch (field->id) {
-            // numbers (XLS-65)
+            // numbers (XLS-65, XLS-66)
             case 3:
                 return "Assets Maximum";
+            case 7:
+                return "Debt Maximum";
+            case 9:
+                return "Loan Origination Fee";
+            case 10:
+                return "Loan Service Fee";
+            case 11:
+                return "Late Payment Fee";
+            case 12:
+                return "Close Payment Fee";
+            case 14:
+                return "Principal Requested";
         }
     }
 

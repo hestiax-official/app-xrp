@@ -147,6 +147,15 @@ static bool is_supported_transaction_type(uint16_t t) {
         case TRANSACTION_VAULT_DEPOSIT:
         case TRANSACTION_VAULT_WITHDRAW:
         case TRANSACTION_VAULT_CLAWBACK:
+        case TRANSACTION_LOAN_BROKER_SET:
+        case TRANSACTION_LOAN_BROKER_DELETE:
+        case TRANSACTION_LOAN_BROKER_COVER_DEPOSIT:
+        case TRANSACTION_LOAN_BROKER_COVER_WITHDRAW:
+        case TRANSACTION_LOAN_BROKER_COVER_CLAWBACK:
+        case TRANSACTION_LOAN_SET:
+        case TRANSACTION_LOAN_DELETE:
+        case TRANSACTION_LOAN_MANAGE:
+        case TRANSACTION_LOAN_PAY:
             return true;
         default:
             return false;
@@ -297,9 +306,10 @@ err_t read_amount(parseContext_t* context, field_t* field) {
     err_t err;
 
     CHECK(peak_next_byte(context, &first_byte));
-    // MPT-denominated vaults are not supported yet: refuse a vault
+    // MPT-denominated vaults are not supported yet: refuse a vault or loan
     // transaction's MPT amount.
-    if (is_vault_transaction(context->transaction_type) &&
+    if ((is_vault_transaction(context->transaction_type) ||
+         is_loan_transaction(context->transaction_type)) &&
         (first_byte >> 7u) == 0 && (first_byte & AMOUNT_MPT_BIT) != 0) {
         err.err = NOT_SUPPORTED;
         return err;
@@ -597,8 +607,9 @@ err_t read_field_value(parseContext_t* context, field_t* field) {
             err = read_issue(context, field);
             break;
         case STI_NUMBER:
-            // Only the vault transactions carry a Number.
-            if (!is_vault_transaction(context->transaction_type)) {
+            // Only the vault and loan transactions carry a Number.
+            if (!is_vault_transaction(context->transaction_type) &&
+                !is_loan_transaction(context->transaction_type)) {
                 err.err = NOT_SUPPORTED;
                 break;
             }
@@ -718,9 +729,15 @@ err_t post_process_transaction(parseContext_t* context) {
         field->data.ptr = NULL;  // Special value to indicate empty regular key
     }
 
-    // A vault transaction that omits a field takes its default, which may be
-    // no limit: show it.
-    for (size_t i = 0; i < DEFAULT_FIELD_COUNT; i++) {
+    // A vault or loan transaction that omits a field takes its default, which
+    // may be no limit, or one payment due in a minute: show it. A
+    // LoanBrokerSet with a LoanBrokerID updates a broker, and an omitted field
+    // then keeps the broker's value.
+    bool updates_broker =
+        context->transaction_type == TRANSACTION_LOAN_BROKER_SET &&
+        count_top_level_fields(context, STI_HASH256,
+                               XRP_HASH256_LOAN_BROKER_ID) != 0;
+    for (size_t i = 0; i < DEFAULT_FIELD_COUNT && !updates_broker; i++) {
         const default_field_t* d = &DEFAULT_FIELDS[i];
         if (d->transaction_type != context->transaction_type ||
             count_top_level_fields(context, d->data_type, d->id) != 0) {
@@ -731,9 +748,15 @@ err_t post_process_transaction(parseContext_t* context) {
         field->data_type = d->data_type;
         field->id = d->id;
         field->length = 0;
-        field->data.ptr = NULL;
         field->array_info.type = ARRAY_NONE;
         field->object_depth = 0;
+        if (d->data_type == STI_UINT16) {
+            field->data.u16 = (uint16_t)d->value;
+        } else if (d->data_type == STI_UINT32) {
+            field->data.u32 = d->value;
+        } else {
+            field->data.ptr = NULL;
+        }
     }
 
     return err;

@@ -58,6 +58,8 @@ typedef enum {
 #define XRP_UINT16_TRANSFER_FEE     0x04
 #define XRP_UINT16_TRADING_FEE      0x05
 #define XRP_UINT16_DISCOUNTED_FEE   0x06
+// UINT16, lending (XLS-66)
+#define XRP_UINT16_MANAGEMENT_FEE_RATE 0x16
 // UINT32
 #define XRP_UINT32_NETWORK_ID            0x01
 #define XRP_UINT32_FLAGS                 0x02
@@ -86,6 +88,17 @@ typedef enum {
 #define XRP_UINT32_NFTOKEN_TAXON         0x2A
 #define XRP_UINT32_SUBSCRIPTION_DATE     0x4B
 #define XRP_UINT32_REDEMPTION_DATE       0x4C
+// UINT32, lending (XLS-66)
+#define XRP_UINT32_PAYMENT_INTERVAL          0x37
+#define XRP_UINT32_GRACE_PERIOD              0x38
+#define XRP_UINT32_PAYMENT_TOTAL             0x3C
+#define XRP_UINT32_COVER_RATE_MINIMUM        0x3E
+#define XRP_UINT32_COVER_RATE_LIQUIDATION    0x3F
+#define XRP_UINT32_OVERPAYMENT_FEE           0x40
+#define XRP_UINT32_INTEREST_RATE             0x41
+#define XRP_UINT32_LATE_INTEREST_RATE        0x42
+#define XRP_UINT32_CLOSE_INTEREST_RATE       0x43
+#define XRP_UINT32_OVERPAYMENT_INTEREST_RATE 0x44
 // HASH128
 #define XRP_HASH128_EMAIL_HASH 0x01
 // HASH256
@@ -102,6 +115,8 @@ typedef enum {
 #define XRP_HASH256_NFTOKEN_SELL_OFFER 0x1D
 #define XRP_HASH256_DOMAIN_ID          0x22
 #define XRP_HASH256_VAULT_ID           0x23
+#define XRP_HASH256_LOAN_BROKER_ID     0x25
+#define XRP_HASH256_LOAN_ID            0x26
 // Not a real XRPL field code: a Vector256 entry has no per-element field ID
 // of its own, so this display-only value is picked far outside the range
 // rippled actually assigns to Hash256 fields.
@@ -127,7 +142,13 @@ typedef enum {
 #define XRP_UINT64_MIN_ACCOUNT_CREATE_AMOUNT 0x1E
 #define XRP_UINT64_LPTOKEN_BALANCE           0x1F
 // NUMBER
-#define XRP_NUMBER_ASSETS_MAXIMUM 0x03
+#define XRP_NUMBER_ASSETS_MAXIMUM       0x03
+#define XRP_NUMBER_DEBT_MAXIMUM         0x07
+#define XRP_NUMBER_LOAN_ORIGINATION_FEE 0x09
+#define XRP_NUMBER_LOAN_SERVICE_FEE     0x0A
+#define XRP_NUMBER_LATE_PAYMENT_FEE     0x0B
+#define XRP_NUMBER_CLOSE_PAYMENT_FEE    0x0C
+#define XRP_NUMBER_PRINCIPAL_REQUESTED  0x0E
 // VL (Blob)
 #define XRP_VL_PUBLIC_KEY       0x01
 #define XRP_VL_MESSAGE_KEY      0x02
@@ -160,6 +181,7 @@ typedef enum {
 #define XRP_ACCOUNT_ATTESTATION_REWARD_ACCOUNT 0x15
 #define XRP_ACCOUNT_LOCKING_CHAIN_DOOR         0x16
 #define XRP_ACCOUNT_ISSUING_CHAIN_DOOR         0x17
+#define XRP_ACCOUNT_COUNTERPARTY               0x1A
 // VECTOR256
 #define XRP_VECTOR256_NF_TOKEN_OFFERS 0x04
 // STOBJECT
@@ -250,13 +272,15 @@ typedef struct {
     char buf[MAX_FIELD_LEN];
 } field_value_t;
 
-// A field a vault transaction takes a default for when it omits it. The
-// parser adds it (post_process_transaction) with no bytes, so that the review
-// shows what the omission means.
+// A field a vault or loan transaction takes a default for when it omits it.
+// The parser adds it (post_process_transaction) with no bytes, and an integer
+// one with its default as its value, so that the review shows what the
+// omission means.
 typedef struct {
     uint16_t transaction_type;
     field_type_t data_type;
     uint8_t id;
+    uint32_t value;
 } default_field_t;
 
 extern const default_field_t DEFAULT_FIELDS[];

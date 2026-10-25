@@ -147,6 +147,26 @@ static const char* testcases[] = {
     "../../tests/standalone/testcases/43-vault-clawback/01-basic.raw",
     "../../tests/standalone/testcases/43-vault-clawback/02-all.raw",
     "../../tests/standalone/testcases/43-vault-clawback/03-zero.raw",
+    "../../tests/standalone/testcases/44-loan-broker-set/01-create.raw",
+    "../../tests/standalone/testcases/44-loan-broker-set/02-update.raw",
+    "../../tests/standalone/testcases/44-loan-broker-set/03-defaults.raw",
+    "../../tests/standalone/testcases/45-loan-broker-delete/01-basic.raw",
+    "../../tests/standalone/testcases/46-loan-broker-cover-deposit/"
+    "01-basic.raw",
+    "../../tests/standalone/testcases/47-loan-broker-cover-withdraw/"
+    "01-basic.raw",
+    "../../tests/standalone/testcases/48-loan-broker-cover-clawback/"
+    "01-basic.raw",
+    "../../tests/standalone/testcases/49-loan-set/01-defaults.raw",
+    "../../tests/standalone/testcases/49-loan-set/02-full.raw",
+    "../../tests/standalone/testcases/50-loan-delete/01-basic.raw",
+    "../../tests/standalone/testcases/51-loan-manage/01-default.raw",
+    "../../tests/standalone/testcases/51-loan-manage/02-impair.raw",
+    "../../tests/standalone/testcases/51-loan-manage/03-unimpair.raw",
+    "../../tests/standalone/testcases/52-loan-pay/01-basic.raw",
+    "../../tests/standalone/testcases/52-loan-pay/02-overpayment.raw",
+    "../../tests/standalone/testcases/52-loan-pay/03-full-payment.raw",
+    "../../tests/standalone/testcases/52-loan-pay/04-late-payment.raw",
     NULL,
 };
 
@@ -209,10 +229,13 @@ typedef struct {
 } expected_error_testcase_t;
 
 static const expected_error_testcase_t expected_error_testcases[] = {
-    // Vaults of an MPT are not supported yet.
+    // Vaults of an MPT, and loans in their asset, are not supported yet.
     {"../../tests/standalone/testcases/38-vault-create/06-mpt-vault.raw",
      NOT_SUPPORTED},
     {"../../tests/standalone/testcases/41-vault-deposit/02-mpt-vault.raw",
+     NOT_SUPPORTED},
+    {"../../tests/standalone/testcases/46-loan-broker-cover-deposit/"
+     "02-mpt-vault.raw",
      NOT_SUPPORTED},
     // A Number not shown as a plain decimal: 1e-40000, which rippled
     // normalizes to zero (no cap).
@@ -239,9 +262,15 @@ static const expected_error_testcase_t expected_error_testcases[] = {
     {"../../tests/standalone/testcases/01-payment/"
      "29-vault-field-in-payment.raw",
      BLIND_SIGN_REQUIRED},
-    // Only the vault transactions carry a Number.
+    // Only the vault and loan transactions carry a Number.
     {"../../tests/standalone/testcases/01-payment/30-number-in-payment.raw",
      NOT_SUPPORTED},
+    // A LoanSet or LoanPay flag bit no formatter names must not vanish from
+    // the review.
+    {"../../tests/standalone/testcases/blind-sign/09-loan-set-unknown-flag.raw",
+     BLIND_SIGN_REQUIRED},
+    {"../../tests/standalone/testcases/blind-sign/10-loan-pay-unknown-flag.raw",
+     BLIND_SIGN_REQUIRED},
     {NULL, 0},
 };
 

@@ -31,9 +31,10 @@ static bool is_top_level(const field_t* field) {
 }
 
 // A VaultCreate carries the vault's asset, so its AssetsMaximum is shown in
-// that asset, as an amount is. A VaultSet does not carry the asset of its
-// AssetsMaximum, the vault's: that one is shown in the asset's base units,
-// labeled as such, and the review warns first.
+// that asset, as an amount is. No other transaction carries the asset of its
+// Number fields (a VaultSet's or a LoanBrokerSet's is the vault's, a
+// LoanSet's the broker's vault's): those are shown in the asset's base
+// units, labeled as such, and the review warns first.
 static xrp_currency_t* find_number_currency(const field_t* field) {
     if (parse_context.transaction_type != TRANSACTION_VAULT_CREATE ||
         field->id != XRP_NUMBER_ASSETS_MAXIMUM || !is_top_level(field)) {
@@ -60,16 +61,27 @@ static xrp_currency_t* find_number_currency(const field_t* field) {
 
 static bool is_maximum(const field_t* field) {
     return field->data_type == STI_NUMBER &&
-           field->id == XRP_NUMBER_ASSETS_MAXIMUM;
+           (field->id == XRP_NUMBER_ASSETS_MAXIMUM ||
+            field->id == XRP_NUMBER_DEBT_MAXIMUM);
 }
 
-// The default of an omitted field (is_default_field): the meaning of a Number
-// or an amount the transaction does not carry.
+// The default of an omitted field (is_default_field): an integer's value,
+// formatted as given, or the meaning of a Number, an account or an amount the
+// transaction does not carry.
 static void format_default_field(field_t* field, field_value_t* dst) {
     switch (field->data_type) {
+        case STI_UINT16:
+            uint16_formatter(field, dst);
+            break;
+        case STI_UINT32:
+            uint32_formatter(field, dst);
+            break;
         case STI_NUMBER:
             strncpy(dst->buf, is_maximum(field) ? "No limit" : "0",
                     sizeof(dst->buf));
+            break;
+        case STI_ACCOUNT:
+            strncpy(dst->buf, "Loan broker's owner", sizeof(dst->buf));
             break;
         default:
             strncpy(dst->buf, "All", sizeof(dst->buf));
@@ -169,7 +181,7 @@ void format_field(field_t* field, field_value_t* dst) {
             if (is_maximum(field) && is_top_level(field) &&
                 is_number_zero(field->data.ptr)) {
                 // rippled 3.4.1: a maximum of 0 is no maximum
-                // (VaultSet.cpp:147)
+                // (VaultSet.cpp:147, LoanSet.cpp:553)
                 strncpy(dst->buf, "No limit", sizeof(dst->buf));
             } else if (currency != NULL) {
                 asset_number_formatter(field, currency, dst);

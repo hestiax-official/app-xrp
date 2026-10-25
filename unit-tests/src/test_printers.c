@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "../src/xrp/amount.h"
+#include "../src/xrp/fmt.h"
 #include "../src/xrp/xrp_helpers.h"
 #include "../src/xrp/xrp_parse.h"
 #include "cx.h"
@@ -247,6 +248,87 @@ void test_print_number_too_long(void** state) {
     assert_int_equal(print_number(buf, 0, data, 0), -1);
 }
 
+static void check_duration(uint8_t id, uint32_t seconds, const char* expected) {
+    field_t field;
+    memset(&field, 0, sizeof(field));
+    field.data_type = STI_UINT32;
+    field.id = id;
+    field.data.u32 = seconds;
+
+    field_value_t value;
+    format_field(&field, &value);
+    assert_string_equal(value.buf, expected);
+}
+
+// A loan's payment interval and grace period, exact, never rounded.
+void test_print_duration(void** state) {
+    (void)state;
+
+    check_duration(XRP_UINT32_PAYMENT_INTERVAL, 0, "0 seconds");
+    check_duration(XRP_UINT32_PAYMENT_INTERVAL, 1, "1 second");
+    check_duration(XRP_UINT32_PAYMENT_INTERVAL, 59, "59 seconds");
+    check_duration(XRP_UINT32_PAYMENT_INTERVAL, 60, "1 minute");
+    check_duration(XRP_UINT32_PAYMENT_INTERVAL, 3661,
+                   "1 hour 1 minute 1 second");
+    check_duration(XRP_UINT32_PAYMENT_INTERVAL, 86399,
+                   "23 hours 59 minutes 59 seconds");
+    check_duration(XRP_UINT32_PAYMENT_INTERVAL, 86400, "1 day");
+    check_duration(XRP_UINT32_PAYMENT_INTERVAL, 86401, "1 day 1 second");
+    check_duration(XRP_UINT32_PAYMENT_INTERVAL, 259200, "3 days");
+    check_duration(XRP_UINT32_PAYMENT_INTERVAL, 2592000, "30 days");
+    check_duration(XRP_UINT32_GRACE_PERIOD, 604800, "7 days");
+    check_duration(XRP_UINT32_GRACE_PERIOD, UINT32_MAX,
+                   "49710 days 6 hours 28 minutes 15 seconds");
+
+    // A payment channel's SettleDelay keeps its own format.
+    check_duration(XRP_UINT32_SETTLE_DELAY, 86400, "86400 s");
+}
+
+static void check_percentage(field_type_t type, uint8_t id, uint32_t value,
+                             const char* expected) {
+    field_t field;
+    memset(&field, 0, sizeof(field));
+    field.data_type = type;
+    field.id = id;
+    if (type == STI_UINT16) {
+        field.data.u16 = (uint16_t)value;
+    } else {
+        field.data.u32 = value;
+    }
+
+    field_value_t value_str;
+    format_field(&field, &value_str);
+    assert_string_equal(value_str.buf, expected);
+}
+
+// Both scales: a TransferRate or Quality in billionths over 1, an XLS-66
+// rate in tenths of a basis point.
+void test_print_percentage(void** state) {
+    (void)state;
+
+    check_percentage(STI_UINT32, XRP_UINT32_TRANSFER_RATE, 0, "0 %");
+    check_percentage(STI_UINT32, XRP_UINT32_TRANSFER_RATE, 999999999,
+                     "Invalid value");
+    check_percentage(STI_UINT32, XRP_UINT32_TRANSFER_RATE, 1000000000, "0 %");
+    check_percentage(STI_UINT32, XRP_UINT32_TRANSFER_RATE, 1002000000, "0.2 %");
+    check_percentage(STI_UINT32, XRP_UINT32_TRANSFER_RATE, 1234567891,
+                     "23.4567891 %");
+    check_percentage(STI_UINT32, XRP_UINT32_TRANSFER_RATE, UINT32_MAX,
+                     "329.4967295 %");
+    check_percentage(STI_UINT32, XRP_UINT32_QUALITY_IN, 0, "100 %");
+    check_percentage(STI_UINT32, XRP_UINT32_QUALITY_IN, 1, "0.0000001 %");
+
+    check_percentage(STI_UINT32, XRP_UINT32_INTEREST_RATE, 0, "0 %");
+    check_percentage(STI_UINT32, XRP_UINT32_INTEREST_RATE, 1, "0.001 %");
+    check_percentage(STI_UINT32, XRP_UINT32_INTEREST_RATE, 9250, "9.25 %");
+    check_percentage(STI_UINT32, XRP_UINT32_INTEREST_RATE, 100000, "100 %");
+    check_percentage(STI_UINT32, XRP_UINT32_INTEREST_RATE, UINT32_MAX,
+                     "4294967.295 %");
+    check_percentage(STI_UINT16, XRP_UINT16_MANAGEMENT_FEE_RATE, 10000, "10 %");
+    check_percentage(STI_UINT16, XRP_UINT16_MANAGEMENT_FEE_RATE, 65535,
+                     "65.535 %");
+}
+
 int main() {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_address),
@@ -256,6 +338,8 @@ int main() {
         cmocka_unit_test(test_print_number),
         cmocka_unit_test(test_print_number_too_long),
         cmocka_unit_test(test_number_in_range),
+        cmocka_unit_test(test_print_duration),
+        cmocka_unit_test(test_print_percentage),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

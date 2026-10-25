@@ -149,6 +149,24 @@ static const char* resolve_transaction_name(uint16_t value) {
             return "Vault Withdraw";
         case TRANSACTION_VAULT_CLAWBACK:
             return "Vault Clawback";
+        case TRANSACTION_LOAN_BROKER_SET:
+            return "Loan Broker Set";
+        case TRANSACTION_LOAN_BROKER_DELETE:
+            return "Loan Broker Delete";
+        case TRANSACTION_LOAN_BROKER_COVER_DEPOSIT:
+            return "Loan Broker Cover Deposit";
+        case TRANSACTION_LOAN_BROKER_COVER_WITHDRAW:
+            return "Loan Broker Cover Withdraw";
+        case TRANSACTION_LOAN_BROKER_COVER_CLAWBACK:
+            return "Loan Broker Cover Clawback";
+        case TRANSACTION_LOAN_SET:
+            return "Loan Set";
+        case TRANSACTION_LOAN_DELETE:
+            return "Loan Delete";
+        case TRANSACTION_LOAN_MANAGE:
+            return "Loan Manage";
+        case TRANSACTION_LOAN_PAY:
+            return "Loan Pay";
         default:
             return "Unknown";
     }
@@ -160,6 +178,8 @@ void uint16_formatter(field_t* field, field_value_t* dst) {
     if (is_transaction_type_field(field)) {
         const char* name = resolve_transaction_name(value);
         strncpy(dst->buf, name, sizeof(dst->buf));
+    } else if (is_percentage(field)) {
+        format_percentage(field, dst);
     } else {
         snprintf(dst->buf, sizeof(dst->buf), "%u", value);
     }
@@ -172,6 +192,8 @@ void uint32_formatter(field_t* field, field_value_t* dst) {
         format_time(field, dst);
     } else if (is_time_delta(field)) {
         format_time_delta(field, dst);
+    } else if (is_duration(field)) {
+        format_duration(field, dst);
     } else if (is_percentage(field)) {
         format_percentage(field, dst);
     } else {

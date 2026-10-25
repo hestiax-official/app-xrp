@@ -270,12 +270,13 @@ def test_blind_sign_enabled(
 # its review starts with an "Asset not verified" warning.
 NUMBER_WITHOUT_ASSET_LABEL = "(vault asset, base units)"
 
-# Vault transactions the parser refuses: a vault of an MPT, not supported yet,
-# and a Number not shown as a plain decimal.
+# Vault and loan transactions the parser refuses: a vault of an MPT, not
+# supported yet, and a Number not shown as a plain decimal.
 REFUSED_VAULT_TXS = (
     "38-vault-create/06-mpt-vault.raw",
     "38-vault-create/07-number-out-of-range.raw",
     "41-vault-deposit/02-mpt-vault.raw",
+    "46-loan-broker-cover-deposit/02-mpt-vault.raw",
 )
 
 
